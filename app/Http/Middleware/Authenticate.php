@@ -12,6 +12,21 @@ class Authenticate extends Middleware
      */
     protected function redirectTo(Request $request): ?string
     {
-        return $request->expectsJson() ? null : route('login');
+        if ($request->expectsJson()) {
+            return null;
+        }
+
+        // Cek jika request URI menuju area backend
+        if ($request->is('backend*')) {
+            return route('backend.login');
+        }
+
+        // Cek jika request URI menuju area frontend (dapat diaktifkan nanti)
+        if ($request->is('frontend*')) {
+            return route('frontend.login');
+        }
+
+        // Redirect default jika tidak ada rute yang cocok
+        return route('backend.login');
     }
 }
