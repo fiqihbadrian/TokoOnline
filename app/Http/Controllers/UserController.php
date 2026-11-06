@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use App\Helpers\ImageHelper;
 
 class UserController extends Controller
 {
@@ -34,7 +36,53 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $messages = [
+            'foto.image' => 'Format gambar gunakan file dengan ekstensi jpeg, jpg, png, atau gif.',
+            'foto.max' => 'Ukuran file gambar Maksimal adalah 1024 KB.'
+        ];
+
+        $validatedData = $request->validate([
+            'nama' => 'required|max:255',
+            'email' => 'required|max:255|email|unique:user',
+            'role' => 'required',
+            'hp' => 'required|min:10|max:13',
+            'password' => 'required|min:4|confirmed',
+            'foto' => 'image|mimes:jpeg,jpg,png,gif|file|max:1024',
+        ], $messages);
+
+        $validatedData['status'] = 0;
+
+        // Menggunakan ImageHelper
+            if ($request->file('foto')) {
+            $file = $request->file('foto');
+            $extension = $file->getClientOriginalExtension();
+            $originalFileName = date('YmdHis') . '_' . uniqid() . '.' . $extension;
+            $directory = 'storage/img-user/';
+            
+            // Simpan gambar dengan ukuran yang ditentukan (385x400)
+            ImageHelper::uploadAndResize($file, $directory, $originalFileName, 385, 400);
+            
+            // Simpan nama file asli di database
+            $validatedData['foto'] = $originalFileName;
+        }
+
+        // Password kombinasi validation
+        $password = $request->input('password');
+        // Pattern: huruf kecil, huruf besar, angka, dan simbol karakter (non-alphanumeric)
+        $pattern = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/';
+
+        if (preg_match($pattern, $password)) {
+            $validatedData['password'] = Hash::make($validatedData['password']);
+            
+            // Fix: User::create() only accepts the array of data
+            User::create($validatedData);
+
+            return redirect()->route('backend.user.index')->with('success', 'Data berhasil tersimpan');
+        } else {
+            return redirect()->back()->withErrors([
+                'password' => 'Password harus terdiri dari kombinasi huruf besar, huruf kecil, angka, dan simbol karakter.'
+            ])->withInput();
+        }
     }
 
     /**
